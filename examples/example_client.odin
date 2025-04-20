@@ -15,6 +15,9 @@ main :: proc() {
 	// Actual demo
 	{
 		client, successful := zpock.client_init("127.0.0.1", 5808)
+		if !successful {
+			return
+		}
 		defer zpock.client_destroy(client)
 
 		zpock.client_on(client, "connect", on_connect)
@@ -30,6 +33,7 @@ main :: proc() {
 		for {
 	    	zpock.client_poll(client)
 	    }
+		
 	}
 
 	log.destroy_console_logger(context.logger)

@@ -54,7 +54,7 @@ client_init :: proc(hostname: string, port: u16, options := DEFAULT_CLIENT_CONNE
 	}
 
 	// Create client host
-	host :=  net.host_create(nil, options.max_connections, options.channel_limit, options.incoming_bandwith, options.outgoing_bandwith)
+	host := net.host_create(nil, options.max_connections, options.channel_limit, options.incoming_bandwith, options.outgoing_bandwith)
 	if host == nil { 
 		log.error("[zpock][client_init] ENet failed to create client host\n")
 
@@ -146,6 +146,7 @@ server_init :: proc(hostname: string, port: u16, options := DEFAULT_CONNECTION_O
 	server.hostname = strings.clone_to_cstring(hostname, allocator)
 
 	net.address_set_host(&server.address, server.hostname)
+	server.address.port = port
 
 	// Create server host
 	host :=  net.host_create(&server.address, options.max_connections, options.channel_limit, options.incoming_bandwith, options.outgoing_bandwith)
@@ -222,6 +223,7 @@ server_poll :: proc(server: ^Zpock_Server, poll_timeout := DEFAULT_CONNECTION_OP
 			log.warnf("[zpock][server_poll] A typeless event recieved: %v\n", event)	
 		}
 		case .RECEIVE: {
+			log.info("RECVIEVE")
 
 		}
 		}
@@ -241,8 +243,8 @@ connect :: proc(client: ^Zpock_Client, timeout := DEFAULT_CLIENT_CONNECTION_OPTI
 		return false
 	}
 
-	log.infof("[zpock][connect] timeout: %v\n", timeout)
-	log.infof("[zpock][connect] blocking: %v\n", blocking)
+	log.debugf("[zpock][connect] timeout: %v\n", timeout)
+	log.debugf("[zpock][connect] blocking: %v\n", blocking)
 
 	event: net.Event
 	// Validate connection through a connection event
