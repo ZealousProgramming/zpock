@@ -1,2 +1,2 @@
-# chum-networking
-A wrapper with utilities around ENet (for now)
+# zpock
+A wrapper around the networking library ENet
