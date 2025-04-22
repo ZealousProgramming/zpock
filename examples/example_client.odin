@@ -20,20 +20,22 @@ main :: proc() {
 		}
 		defer zpock.client_destroy(client)
 
-		zpock.client_on(client, "connect", on_connect)
-		zpock.client_on(client, "disconnect", on_disconnect)
+		zpock.on(client, "connect", on_connect)
+		zpock.on(client, "disconnect", on_disconnect)
 	    
 	    successful = zpock.connect(client)
 	    if !successful {
 	    	return
 	    }
-	    // zpock.send()
-	    
+		defer zpock.disconnect(client)
+
 	    // TODO(devon): Figure out build/send packet api
+	    // zpock.send()
+	    zpock.send(client, "Ayo, this is the client bruv..")
+	    
 		for {
-	    	zpock.client_poll(client)
+	    	zpock.poll(client)
 	    }
-		
 	}
 
 	log.destroy_console_logger(context.logger)

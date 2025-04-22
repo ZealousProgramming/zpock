@@ -20,15 +20,14 @@ main :: proc() {
 		}
 		defer zpock.server_destroy(server)
 
-		zpock.server_on(server, "connect", on_connect)
-		zpock.server_on(server, "disconnect", on_disconnect)
-	    
-	    // zpock.send()
+		zpock.on(server, "connect", on_connect)
+		zpock.on(server, "disconnect", on_disconnect)
 	    
 	    // TODO(devon): Figure out build/send packet api
+	    // zpock.send()
 
 	    for {
-	    	zpock.server_poll(server)
+	    	zpock.poll(server)
 	    }
 	}
 
