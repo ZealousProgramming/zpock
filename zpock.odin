@@ -8,30 +8,28 @@ Zpock_Callback :: union {
 	#type proc(),
 }
 
-Zpock_Host :: union {
-	Zpock_Server,
-	Zpock_Client,
+Zpock_Host :: struct {
+	host: ^net.Host,
+	hostname: cstring,
+	port: u16,
+
+	events: map[string]Zpock_Callback,
 }
 
 Zpock_Client :: struct {
-	host: ^net.Host,
+	// Yuck Yuck Yuck - spit spit
+	using _:Zpock_Host,
+
 	server_peer: ^net.Peer,
 	server_address: net.Address,
 
-	hostname: cstring,
-	port: u16,
-
-	events: map[string]Zpock_Callback,
 }
 
 Zpock_Server :: struct {
-	host: ^net.Host,
+	// Yuck Yuck Yuck - spit spit
+	using _: Zpock_Host,
+
 	address: net.Address,
-
-	hostname: cstring,
-	port: u16,
-
-	events: map[string]Zpock_Callback,
 }
 
 Zpock_Connection_Options :: struct {
@@ -82,56 +80,6 @@ client_destroy :: proc(client: ^Zpock_Client, allocator := context.allocator) {
 	free(client, allocator)
 }
 
-client_on :: proc(client: ^Zpock_Client, event_name: string, callback: Zpock_Callback, overwrite := false) -> bool {
-	if client == nil { return false }
-
-	if event_name in client.events {
-		if !overwrite {
-			log.errorf("[zpock][client_on] Event '%v' already has a registered callback, if this was intended, please provide the 'overwrite' flag to the 'on' procedure call\n", event_name)
-			return false
-		}
-	}
-
-	log.infof("[zpock][client_on] Callback registered for event '%v'\n", event_name)
-	client.events[event_name] = callback
-
-	return true
-}
-
-client_poll :: proc(client: ^Zpock_Client, poll_timeout := DEFAULT_CLIENT_CONNECTION_OPTIONS.poll_timeout) {
-	if client == nil { return }
-
-	event: net.Event
-
-	for net.host_service(client.host, &event, poll_timeout) > 0 {
-		switch event.type {
-		case .CONNECT: {
-			log.infof("[zpock][client_poll] A new client connected from %v:%v\n", event.peer.address.host, event.peer.address.port)
-
-			if "connect" in client.events {
-				connect := client.events["connect"].(proc())
-				connect()
-			}
-		}
-		case .DISCONNECT: {
-			log.infof("[zpock][client_poll] A new client disconnect_timeout: %v\n", event.peer.data)
-
-			if "disconnect" in client.events {
-				disconnect := client.events["disconnect"].(proc())
-				disconnect()
-			}
-			
-			event.peer.data = nil
-		}
-		case .NONE: {
-			log.warnf("[zpock][client_poll] A typeless event recieved: %v\n", event)	
-		}
-		case .RECEIVE: {
-
-		}
-		}
-	}
-}
 
 server_init :: proc(hostname: string, port: u16, options := DEFAULT_CONNECTION_OPTIONS, allocator := context.allocator) -> (^Zpock_Server, bool) {
 	// Initialize ENet
@@ -178,60 +126,6 @@ server_destroy :: proc(server: ^Zpock_Server, allocator := context.allocator) {
 	free(server, allocator)
 }
 
-server_on :: proc(server: ^Zpock_Server, event_name: string, callback: Zpock_Callback, overwrite := false) -> bool {
-	if server == nil { return false }
-
-	if event_name in server.events {
-		if !overwrite {
-			log.errorf("[zpock][server_on] Event '%v' already has a registered callback, if this was intended, please provide the 'overwrite' flag to the 'on' procedure call\n", event_name)
-			return false
-		}
-	}
-
-	log.infof("[zpock][server_on] Callback registered for event '%v'\n", event_name)
-	server.events[event_name] = callback
-
-	return true
-}
-
-server_poll :: proc(server: ^Zpock_Server, poll_timeout := DEFAULT_CONNECTION_OPTIONS.poll_timeout) {
-	if server == nil { return }
-
-	event: net.Event
-
-	for net.host_service(server.host, &event, poll_timeout) > 0 {
-		switch event.type {
-		case .CONNECT: {
-			log.infof("[zpock][server_poll] A new client connected from %v:%v\n", event.peer.address.host, event.peer.address.port)
-
-			if "connect" in server.events {
-				connect := server.events["connect"].(proc())
-				connect()
-			}
-		}
-		case .DISCONNECT: {
-			log.infof("[zpock][server_poll] A client disconnect_timeout: %v\n", event.peer.data)
-
-			if "disconnect" in server.events {
-				disconnect := server.events["disconnect"].(proc())
-				disconnect()
-			}
-			
-			event.peer.data = nil
-		}
-		case .NONE: {
-			log.warnf("[zpock][server_poll] A typeless event recieved: %v\n", event)	
-		}
-		case .RECEIVE: {
-			log.info("RECVIEVE")
-
-		}
-		}
-	}
-}
-
-
-
 connect :: proc(client: ^Zpock_Client, timeout := DEFAULT_CLIENT_CONNECTION_OPTIONS.connect_timeout, blocking := DEFAULT_CONNECTION_OPTIONS.blocking) -> bool {
 	net.address_set_host(&client.server_address, client.hostname)
 	client.server_address.port = client.port
@@ -272,6 +166,120 @@ connect :: proc(client: ^Zpock_Client, timeout := DEFAULT_CLIENT_CONNECTION_OPTI
 
 	client.server_peer = server
 	return true
+}
+
+disconnect :: proc(client: ^Zpock_Client, timeout := DEFAULT_CLIENT_CONNECTION_OPTIONS.disconnect_timeout) -> bool{
+	net.peer_disconnect(client.server_peer, 0)
+
+	successful := false
+
+	event: net.Event
+	for net.host_service(client.host, &event, timeout) > 0 {
+		#partial switch event.type {
+		case .DISCONNECT: {
+			log.infof("[zpock][disconnect] Client successfully disconnected from server")
+			successful = true
+		}
+		case: {
+
+		}
+		}
+	}
+
+	return successful
+}
+
+on :: proc(host: ^Zpock_Host, event_name: string, callback: Zpock_Callback, overwrite := false) -> bool {
+	if host == nil { return false }
+
+	if event_name in host.events {
+		if !overwrite {
+			log.errorf("[zpock][on] Event '%v' already has a registered callback, if this was intended, please provide the 'overwrite' flag to the 'on' procedure call\n", event_name)
+			return false
+		}
+	}
+
+	log.infof("[zpock][on] Callback registered for event '%v'\n", event_name)
+	host.events[event_name] = callback
+
+	return true
+}
+
+poll :: proc(host: ^Zpock_Host, poll_timeout := DEFAULT_CONNECTION_OPTIONS.poll_timeout, allocator := context.allocator) {
+	if host == nil { return }
+
+	event: net.Event
+
+	for net.host_service(host.host, &event, poll_timeout) > 0 {
+		switch event.type {
+		case .CONNECT: {
+			log.infof("[zpock][poll] A new client connected from %v:%v\n", event.peer.address.host, event.peer.address.port)
+
+			if "connect" in host.events {
+				connect := host.events["connect"].(proc())
+				connect()
+			}
+		}
+		case .DISCONNECT: {
+			log.infof("[zpock][poll] A client disconnect_timeout: %v\n", event.peer.data)
+
+			if "disconnect" in host.events {
+				disconnect := host.events["disconnect"].(proc())
+				disconnect()
+			}
+			
+			event.peer.data = nil
+		}
+		case .NONE: {
+			log.warnf("[zpock][poll] A typeless event recieved: %v\n", event)	
+		}
+		case .RECEIVE: {
+			log.debugf(
+				"A packet of length %v containing %v was received from %v:%v on channel %v.\n",
+				event.packet.dataLength,
+				event.packet.data,
+				event.peer.address.host,
+				event.peer.address.port,
+				event.channelID,
+			)
+
+			defer net.packet_destroy(event.packet)
+
+			content, _ := strings.clone_from_bytes(event.packet.data[:event.packet.dataLength], context.temp_allocator) 
+			log.info(content)
+			log.info("\n")
+		}
+		}
+	}
+}
+
+send :: proc {
+	send_message,
+	client_send_message,
+}
+
+client_send_message :: proc(client: ^Zpock_Client, message:string, reliable: bool = false, channel_id: u8 = 0) {
+	send_message(client.server_peer, message, reliable, channel_id)
+}
+
+send_message :: proc (peer: ^net.Peer, message: string, reliable: bool = false, channel_id: u8 = 0) {
+	flags: net.PacketFlags
+	if reliable {
+		flags += {.RELIABLE}
+	}
+
+	packet := net.packet_create(raw_data(message), size_of(u8) * len(message), flags)
+
+	if packet == nil {
+		log.warnf("[zpock][send_message] Failed to create packet of size %v\n", size_of(message))
+		return 
+	}
+
+	err := net.peer_send(peer, channel_id, packet)
+	if err != 0 {
+		log.errorf("[zpock][send_message] Failed to send packet to outgoingID(%v) incomingId(%v): %v\n", peer.outgoingPeerID, peer.incomingPeerID, err)
+		return 
+	}
 }
 
 
