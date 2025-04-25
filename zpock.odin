@@ -95,6 +95,7 @@ client_init :: proc(
 	client.port = port
 
 	client.handlers = make(map[Opcode]Packet_Handler, allocator)
+	client.events = make(map[string]Callback, allocator)
 
 	return client, true
 }
@@ -110,6 +111,7 @@ client_destroy :: proc(client: ^Client, allocator := context.allocator) {
 	net.deinitialize()
 
 	delete(client.handlers)
+	delete(client.events)
 
 	free(client, allocator)
 }
@@ -155,6 +157,7 @@ server_init :: proc(
 
 	server.host = host
 	server.handlers = make(map[Opcode]Packet_Handler, allocator)
+	server.events = make(map[string]Callback, allocator)
 
 	log.infof("Server is listening on %v:%v...\n", hostname, port)
 
@@ -172,6 +175,7 @@ server_destroy :: proc(server: ^Server, allocator := context.allocator) {
 	net.deinitialize()
 
 	delete(server.handlers)
+	delete(server.events)
 
 	free(server, allocator)
 }
