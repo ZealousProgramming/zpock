@@ -3,24 +3,15 @@ A wrapper around the networking library ENet for quick and easy use
 
 
 ``` go
-// Ideal API for sending packets
+// Setting opcode handlers
+zpock.set_handler(client, op_code, handler_func)
 
-// For single "message" packets
-zpock.send(client, "yadda")
+// Packet building for multiple segments of a packet
+packet_builder: zpock.Packet_Builder
+zpock.write_opcode(&packet_builder, opcode_one)
+zpock.write_string(&packet_builder, &value)
 
-// Setting a custom serializer
-zpock.set_serializer(client, serialize_func, deserialize_func)
-zpock.set_serialize(client, serialize_func)
-zpock.set_deserialize(client, deserialize_func)
-
-some_obj: Some_Object
-zpock.send(client, some_obj)
-
-// Packet building for multiple "messages"
-packet := zpock.packet()
-zpock.packet_append(&packet, header_one, value_one)
-zpock.packet_append(&packet, header_two, value_two)
-zpock.build() // Do I need this?
-
-zpock.send(client, &packet)
+zpock.send(client, zpock.to_bytes(&packet_builder))
+// or
+zpock.send(client, &packet_builder)
 ```

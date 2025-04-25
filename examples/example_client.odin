@@ -1,10 +1,16 @@
 package examples
 
-import "core:mem"
-import "core:log"
 import fmt "core:fmt"
+import "core:log"
+import "core:mem"
 
 import "../"
+
+@(private = "file")
+Ops :: enum (zpock.Opcode) {
+	Invalid,
+	Hello,
+}
 
 main :: proc() {
 	track: mem.Tracking_Allocator
@@ -22,20 +28,17 @@ main :: proc() {
 
 		zpock.on(client, "connect", on_connect)
 		zpock.on(client, "disconnect", on_disconnect)
-	    
-	    successful = zpock.connect(client)
-	    if !successful {
-	    	return
-	    }
+		zpock.set_handler(client, zpock.Opcode(Ops.Hello), hello_handler)
+
+		successful = zpock.connect(client)
+		if !successful {
+			return
+		}
 		defer zpock.disconnect(client)
 
-	    // TODO(devon): Figure out build/send packet api
-	    // zpock.send()
-	    zpock.send(client, "Ayo, this is the client bruv..")
-	    
 		for {
-	    	zpock.poll(client)
-	    }
+			zpock.poll(client)
+		}
 	}
 
 	log.destroy_console_logger(context.logger)
@@ -45,20 +48,23 @@ main :: proc() {
 	}
 
 	for bad_free in track.bad_free_array {
-		fmt.printf(
-			"%p allocation %p was freed incorrectly\n",
-			bad_free.location,
-			bad_free.memory,
-		)
+		fmt.printf("%p allocation %p was freed incorrectly\n", bad_free.location, bad_free.memory)
 	}
 }
 
-@(private ="file")
+@(private = "file")
 on_connect :: proc() {
 	log.info("Connection to the server successful")
 }
 
-@(private ="file")
+@(private = "file")
 on_disconnect :: proc() {
 	log.info("Diconnection from the server successful")
+}
+
+@(private = "file")
+hello_handler :: proc(reader: ^zpock.Packet_Reader, packet: ^zpock.Packet) {
+	message, _ := zpock.read_string(reader, .Little, context.temp_allocator)
+
+	log.infof("Recieved a message from the server: %v\n", message)
 }
