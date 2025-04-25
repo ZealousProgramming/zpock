@@ -5,6 +5,7 @@ import "core:encoding/endian"
 import "core:log"
 import "core:slice"
 import "core:strings"
+import "core:mem"
 import net "vendor:ENet"
 
 // Aliases 
@@ -574,6 +575,53 @@ read_string :: proc(reader: ^Packet_Reader, byte_order := endian.Byte_Order.Big,
 	return value, true
 }
 
+read_vec :: proc(reader: ^Packet_Reader, component_count: uint, byte_order := endian.Byte_Order.Big, allocator := context.allocator) -> ([]f32, bool) {
+	size_f32: uint = size_of(f32)
+
+	if reader == nil || reader.length <= 0 {
+		log.warnf("Packet data was nil or empty..")
+		return {}, false
+	}
+
+	if reader.offset + size_f32 >= reader.length {
+		log.warnf("Not enough bytes to read..")
+		return {}, false
+	}
+
+	vec_bytes := reader.data[reader.offset : reader.offset + size_f32 * component_count]
+	float_bytes := slice.reinterpret([]f32, vec_bytes)
+
+	log.debugf("Content: %v\n", float_bytes)
+
+	reader.offset += size_f32 * component_count
+
+	return float_bytes, true
+}
+
+read_color :: proc(reader: ^Packet_Reader, byte_order := endian.Byte_Order.Big, allocator := context.allocator) -> ([]u8, bool) {
+	size_u8: uint = size_of(u8)
+
+	if reader == nil || reader.length <= 0 {
+		log.warnf("Packet data was nil or empty..")
+		return {}, false
+	}
+
+	if reader.offset + size_u8 >= reader.length {
+		log.warnf("Not enough bytes to read..")
+		return {}, false
+	}
+
+	color_bytes := reader.data[reader.offset : reader.offset + size_u8 * 4]
+	float_bytes := slice.reinterpret([]u8, color_bytes)
+
+	log.debugf("Content: %v\n", float_bytes)
+
+	reader.offset += size_u8 * 4
+
+	return float_bytes, true
+
+}
+
 // Writes
 write_opcode :: proc(builder: ^Packet_Builder, data: u16be, allocator := context.allocator) {
 	log.debugf("Writing Opcode: %v\n", data)
@@ -589,6 +637,38 @@ write_string :: proc(builder: ^Packet_Builder, data: ^string, allocator := conte
 
 	bytes.buffer_write(builder, buff[:])
 	bytes.buffer_write(builder, transmute([]u8)data^)
+}
+
+write_vec2 :: proc(builder: ^Packet_Builder, data: ^[2]f32, allocator := context.allocator) {
+	bitties := mem.ptr_to_bytes(data)
+
+	log.debugf("Writing Vec of size: %v\n", len(bitties))
+
+	bytes.buffer_write(builder, bitties)
+}
+
+write_vec3 :: proc(builder: ^Packet_Builder, data: ^[3]f32, allocator := context.allocator) {
+	bitties := mem.ptr_to_bytes(data)
+
+	log.debugf("Writing Vec of size: %v\n", len(bitties))
+
+	bytes.buffer_write(builder, bitties)
+}
+
+write_vec4 :: proc(builder: ^Packet_Builder, data: ^[4]f32, allocator := context.allocator) {
+	bitties := mem.ptr_to_bytes(data)
+
+	log.debugf("Writing Vec of size: %v\n", len(bitties))
+
+	bytes.buffer_write(builder, bitties)
+}
+
+write_color :: proc(builder: ^Packet_Builder, data: ^[4]u8, allocator := context.allocator) {
+	bitties := mem.ptr_to_bytes(data)
+
+	log.debugf("Writing Vec of size: %v\n", len(bitties))
+
+	bytes.buffer_write(builder, bitties)
 }
 
 
