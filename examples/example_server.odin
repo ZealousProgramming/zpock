@@ -54,10 +54,15 @@ on_connect :: proc(host: ^zpock.Host, peer: ^zpock.Peer) {
 	)
 
 	response: string = "Hello gov'na, run from me my dude"
+
 	packet_builder: zpock.Packet_Builder
+	defer zpock.packet_builder_destroy(&packet_builder)
+
 	zpock.write_opcode(&packet_builder, zpock.Opcode(Ops.Hello))
 	zpock.write_string(&packet_builder, &response)
 	zpock.send_reliable(peer, &packet_builder)
+
+
 }
 
 @(private = "file")

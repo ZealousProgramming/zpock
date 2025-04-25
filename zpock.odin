@@ -149,7 +149,7 @@ server_init :: proc(
 		options.outgoing_bandwith,
 	)
 	if host == nil {
-		log.error("ENet failed to create client host\n")
+		log.error("ENet failed to create server host\n")
 		delete(server.hostname, allocator)
 		free(server, allocator)
 		return nil, false
