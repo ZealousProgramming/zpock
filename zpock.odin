@@ -8,13 +8,14 @@ import "core:strings"
 import "core:mem"
 import net "vendor:ENet"
 
+
 // Aliases 
 // ---------------
 Opcode :: u16be
 Packet :: net.Packet
 Peer :: net.Peer
 Packet_Builder :: bytes.Buffer
-Packet_Handler :: #type proc(reader: ^Packet_Reader, packet: ^Packet)
+Packet_Handler :: #type proc(peer: ^Peer, reader: ^Packet_Reader, allocator: mem.Allocator)
 
 Callback :: union {
 	#type proc(),
@@ -33,6 +34,8 @@ Host :: struct {
 	port:     u16,
 	events:   map[string]Callback,
 	handlers: map[Opcode]Packet_Handler,
+
+	allocator: mem.Allocator,
 }
 
 Client :: struct {
@@ -97,6 +100,8 @@ client_init :: proc(
 	client.handlers = make(map[Opcode]Packet_Handler, allocator)
 	client.events = make(map[string]Callback, allocator)
 
+	client.allocator = allocator
+
 	return client, true
 }
 
@@ -159,6 +164,8 @@ server_init :: proc(
 	server.handlers = make(map[Opcode]Packet_Handler, allocator)
 	server.events = make(map[string]Callback, allocator)
 
+	server.allocator = allocator
+
 	log.infof("Server is listening on %v:%v...\n", hostname, port)
 
 	return server, true
@@ -202,7 +209,7 @@ connect :: proc(
 	// Validate connection through a connection event
 	if net.host_service(client.host, &event, timeout) > 0 && event.type == .CONNECT {
 		log.infof(
-			"Client connect to %v:%v successfully established\n",
+			"Client connection to %v:%v successfully established\n",
 			client.hostname,
 			client.port,
 		)
@@ -344,7 +351,7 @@ poll :: proc(
 					return
 				}
 
-				host.handlers[opcode](&reader, event.packet)
+				host.handlers[opcode](event.peer, &reader, host.allocator)
 			}
 		}
 	}
@@ -641,6 +648,11 @@ write_string :: proc(builder: ^Packet_Builder, data: ^string, allocator := conte
 
 	bytes.buffer_write(builder, buff[:])
 	bytes.buffer_write(builder, transmute([]u8)data^)
+}
+
+write_u16 :: proc(builder: ^Packet_Builder, data: u16, allocator := context.allocator) {
+	log.debugf("Writing u16 : %v\n", data)
+	bytes.buffer_write(builder, slice.to_bytes([]u16be{cast(u16be)data}))
 }
 
 write_vec2 :: proc(builder: ^Packet_Builder, data: ^[2]f32, allocator := context.allocator) {

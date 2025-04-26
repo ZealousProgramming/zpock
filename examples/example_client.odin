@@ -63,7 +63,7 @@ on_disconnect :: proc() {
 }
 
 @(private = "file")
-hello_handler :: proc(reader: ^zpock.Packet_Reader, packet: ^zpock.Packet) {
+hello_handler :: proc(peer: ^zpock.Peer, reader: ^zpock.Packet_Reader, allocator := context.allocator) {
 	message, _ := zpock.read_string(reader, .Little, context.temp_allocator)
 
 	log.infof("Recieved a message from the server: %v\n", message)
