@@ -470,6 +470,49 @@ send_packet :: proc(peer: ^Peer, packet: []byte, reliable: bool = false, channel
 	}
 }
 
+
+broadcast_reliable  :: proc(
+	host: ^Host,
+	excluded_id: u16,
+	packet: []byte,
+	reliable: bool = false,
+	channel_id: u8 = 0,
+)  {
+	broadcast(host, excluded_id, packet, true, channel_id)
+}
+
+broadcast :: proc(
+	host: ^Host,
+	excluded_id: u16,
+	packet: []byte,
+	reliable: bool = false,
+	channel_id: u8 = 0,
+)  {
+	flags: net.PacketFlags
+	if reliable {
+		flags += {.RELIABLE}
+	}
+
+	packet := net.packet_create(raw_data(packet), len(packet), flags)
+
+	if packet == nil {
+		log.warnf("Failed to create packet of size %v\n", size_of(packet))
+		return
+	}
+
+	h := host.host
+	for idx: uint = 0; idx < h.peerCount; idx += 1 {
+		if h.peers[idx].incomingPeerID == excluded_id {continue}
+		if h.peers[idx].state != .CONNECTED {continue}
+
+		net.peer_send(&h.peers[idx], channel_id, packet)
+	}
+
+	log.debug(
+		"Broadcasting packet to connected peers",
+	)
+}
+
 packet_builder_destroy :: proc(builder: ^Packet_Builder, allocator := context.allocator) {
 	delete(builder.buf)
 }
